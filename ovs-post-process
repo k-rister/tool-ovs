@@ -34,10 +34,12 @@ def conntrack_post_process(filename: str):
         proto_udp = {'protocol': 'udp'}
         proto_icmp = {'protocol': 'icmp'}
         proto_other = {'protocol': 'other'}
+        proto_total = {'protocol': 'total'}
         tcp_sample = {'end': 0, 'value': 0}
         udp_sample = {'end': 0, 'value': 0}
         icmp_sample = {'end': 0, 'value': 0}
         other_sample = {'end': 0, 'value': 0}
+        total_sample = {'end': 0, 'value': 0}
         file_id_ovs = 'ovs-conntrack'
         for line in file:
             if 'DATE' in line:
@@ -50,6 +52,11 @@ def conntrack_post_process(filename: str):
                 udp_sample['end'] = end_stamp_ms
                 icmp_sample['end'] = end_stamp_ms
                 other_sample['end'] = end_stamp_ms
+                total_sample['end'] = end_stamp_ms
+            elif 'Total' in line:
+                # Total: 0
+                total_sample['value'] = int(line.split(':')[1])
+                log_sample(file_id_ovs, desc, proto_total, total_sample)
             elif 'TCP' in line:
                 # TCP: 2587
                 tcp_sample['value'] = int(line.split(':')[1])
@@ -76,51 +83,55 @@ def dpctl_memory_show_process(filename: str):
     file_name = filename
     with lzma.open(file_name,'rt') as file:
         desc = {'source': 'ovs-appctl', 'class': 'count', 'type': 'mem-show'}
-        handler = {'source' : 'handlers'}
-        ofconns = {'source' : 'ofconns'}
-        ports = {'source' : 'ports'}
-        revalidators = {'source' : 'revalidators'}
-        rules = {'source' : 'rules'}
-        udpif_keys = {'source' : 'udpif-keys'}
-        handler_smpl = {'end': 0, 'value': 0}
-        ofconns_smpl = {'end': 0, 'value': 0}
-        ports_smpl = {'end': 0, 'value': 0}
-        revalidators_smpl = {'end': 0, 'value': 0}
-        rules_smpl = {'end': 0, 'value': 0}
-        udpif_smpl = {'end': 0, 'value': 0}
         file_id = 'ovs-memory-show'
+        end_stamp_ms = 0
+        metric_keys = ['ofconns', 'ports', 'revalidators', 'rules']
         for line in file:
+            line = line.strip()
+            if not line:
+                continue
             if 'DATE' in line:
-                # Parses output of date +%s.%N
                 time_stamp_float = float(line.split(':')[1])
                 end_stamp_ms = int(time_stamp_float * 1000)
-                handler_smpl['end'] = end_stamp_ms
-                ofconns_smpl['end'] = end_stamp_ms
-                ports_smpl['end'] = end_stamp_ms
-                revalidators_smpl['end'] = end_stamp_ms
-                rules_smpl['end'] = end_stamp_ms
-                udpif_smpl['end'] = end_stamp_ms
-            elif 'handlers'in line:
-                # handlers:59 ofconns:2 ports:49 revalidators:21 rules:6664 udpif keys:643
-                data = line.split(' ')
-                try:
-                    handler_smpl['value'] = int(data[0].split(':')[1])
-                    ofconns_smpl['value'] = int(data[1].split(':')[1])
-                    ports_smpl['value'] = int(data[2].split(':')[1])
-                    revalidators_smpl['value'] = int(data[3].split(':')[1])
-                    rules_smpl['value'] = int(data[4].split(':')[1])
-                    udpif_smpl['value'] = int(data[7].split(':')[1])
-                except IndexError as e:
-                    print(e,data)
-                    continue
-                log_sample(file_id, desc, handler, handler_smpl)
-                log_sample(file_id, desc, ofconns, ofconns_smpl)
-                log_sample(file_id, desc, ports, ports_smpl)
-                log_sample(file_id, desc, revalidators, revalidators_smpl)
-                log_sample(file_id, desc, rules, rules_smpl)
-                log_sample(file_id, desc, udpif_keys, udpif_smpl)
-            else:
-                continue
+            elif 'ofconns:' in line:
+                # Handles both OVS 3.3.x and 3.5.x formats:
+                #   3.3.x: handlers:59 ofconns:2 ports:49 revalidators:21 rules:6664 udpif keys:643
+                #   3.5.x: idl-cells-Open_vSwitch:1264 ofconns:4 ports:20 revalidators:3 rules:557 udpif keys:1
+                fields = {}
+                tokens = line.split()
+                i = 0
+                while i < len(tokens):
+                    token = tokens[i]
+                    if ':' in token:
+                        key, val = token.rsplit(':', 1)
+                        try:
+                            fields[key] = int(val)
+                        except ValueError:
+                            pass
+                    elif i + 1 < len(tokens) and ':' not in token:
+                        # Handle multi-word keys like "udpif keys:643"
+                        combined = token + ' ' + tokens[i + 1]
+                        if ':' in tokens[i + 1]:
+                            key, val = combined.rsplit(':', 1)
+                            try:
+                                fields[key] = int(val)
+                            except ValueError:
+                                pass
+                            i += 1
+                    i += 1
+
+                sample = {'end': end_stamp_ms, 'value': 0}
+                for key in metric_keys:
+                    if key in fields:
+                        sample['value'] = fields[key]
+                        log_sample(file_id, desc, {'source': key}, copy.copy(sample))
+                if 'udpif keys' in fields:
+                    sample['value'] = fields['udpif keys']
+                    log_sample(file_id, desc, {'source': 'udpif-keys'}, copy.copy(sample))
+                first_key = line.split(':')[0].split()[0] if line else None
+                if first_key and first_key in fields:
+                    sample['value'] = fields[first_key]
+                    log_sample(file_id, desc, {'source': first_key}, copy.copy(sample))
 
     finish_samples()
 

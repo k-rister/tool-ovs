@@ -15,7 +15,7 @@
             "name": "ovs_src",
             "type": "source",
             "source_info": {
-                "url": "https://www.openvswitch.org/releases/openvswitch-3.3.0.tar.gz",
+                "url": "https://www.openvswitch.org/releases/openvswitch-3.5.4.tar.gz",
                 "filename": "ovs.tar.gz",
                 "commands": {
                     "unpack": "tar xf ovs.tar.gz",
