@@ -8,7 +8,12 @@ vswitchd_pid=$(pgrep ovs-vswitchd)
 re='^[1-9][0-9]*$'
 
 if [[ ! "$interval" =~ $re ]]; then
-    echo "Interval must a be a positive interger, exiting"
+    echo "Interval must be a positive integer, exiting"
+    exit 1
+fi
+
+if [ -z "$vswitchd_pid" ]; then
+    echo "ERROR: ovs-vswitchd is not running, cannot collect stats"
     exit 1
 fi
 
@@ -43,7 +48,16 @@ appctl_cmds=("dpctl/dump-flows --more --names" "dpctl/ct-stats-show" "dpctl/show
              "coverage/show" "memory/show" "upcall/show" "dpif-netdev/pmd-perf-show")
 target="--target "$ovs_dir"/ovs-vswitchd.$vswitchd_pid.ctl"
 
-while true; do
+has_netdev_datapath=0
+datapath_types=$(ovs-vsctl get Open_vSwitch . datapath_types 2>/dev/null)
+if [[ "$datapath_types" == *"netdev"* ]]; then
+    has_netdev_datapath=1
+fi
+
+shutdown=0
+trap 'shutdown=1' SIGTERM
+
+while [ "$shutdown" -eq 0 ]; do
     for bridge in $bridges; do
         for ofctl_cmd in "${ofctl_cmds[@]}"; do
             ofctl_file=ofctl-`echo $ofctl_cmd | awk '{print $1}' | sed -e sX/X-X`.txt
@@ -56,7 +70,9 @@ while true; do
 
     ## see https://www.openvswitch.org/support/dist-docs/ovs-vswitchd.8.html "DATAPATH FLOW TABLE DEBUGGING COMMANDS"
 
-    ovs-appctl $target dpif-netdev/pmd-stats-clear 2>&1 >> pmd-stats-clear.stdouterr.txt
+    if [ "$has_netdev_datapath" -eq 1 ]; then
+        ovs-appctl $target dpif-netdev/pmd-stats-clear 2>&1 >> pmd-stats-clear.stdouterr.txt
+    fi
     sleep $interval
     for appctl_cmd in "${appctl_cmds[@]}"; do
         appctl_file=appctl-`echo $appctl_cmd | awk '{print $1}' | sed -e sX/X-X`.txt
