@@ -1,4 +1,6 @@
 #!/bin/bash
+# -*- mode: sh; indent-tabs-mode: nil; sh-basic-offset: 4 -*-
+# vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=bash
 exec >ovs-stop-stderrout.txt
 exec 2>&1
 
@@ -30,4 +32,7 @@ if [ -f /usr/bin/xz ]; then
     echo "Compressing any ovs data files"
     xz -T 0 ofctl*.txt
     xz -T 0 appctl*.txt
+    if [ -f pmd-stats-clear.stdouterr.txt ]; then
+        xz -T 0 pmd-stats-clear.stdouterr.txt
+    fi
 fi

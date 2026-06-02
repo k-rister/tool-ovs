@@ -178,6 +178,8 @@ def compute_and_log_stats(br_name: str, new_br_data: dict, old_br_data: dict):
         print("Number of ports changed between measurements on %s" % br_name)
 
     time_delta = new_br_data['timestamp'] - old_br_data['timestamp']
+    if time_delta <= 0:
+        return
     for intf_name in new_br_data.keys():
         if 'timestamp' in intf_name:
             continue
@@ -223,6 +225,8 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                 '^Time:.*$|' +
                 '^  Iterations:.*$|' +
                 '^  - Used TSC cycles:.*$|' +
+                '^  - sleep iterations:.*$|' +
+                '^  Sleep time \\(us\\):.*$|' +
                 '^  Tx batches:.*$|' +
                 '^  Datapath passes:.*$|' +
                 '^$', line):
@@ -330,9 +334,7 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
 
                     print('WARNING: ********** could not find match for [' + line + ']')
                 continue
-                print('pmd not defined')
             continue
-            print('epoch_ms not defined')
     finish_samples()
 
 
@@ -471,6 +473,12 @@ def dpctl_datapath_stats(filename: str):
                 curr_lookups_miss = int(pairs[2].split(':')[1])
                 curr_lookups_lost = int(pairs[3].split(':')[1])
 
+                if time_delta_sec <= 0:
+                    prev_lookups_hit = curr_lookups_hit
+                    prev_lookups_miss = curr_lookups_miss
+                    prev_lookups_lost = curr_lookups_lost
+                    continue
+
                 lookups_hit_sample['value'] = (curr_lookups_hit - prev_lookups_hit) / time_delta_sec
                 lookups_miss_sample['value'] = (curr_lookups_miss - prev_lookups_miss) / time_delta_sec
                 lookups_lost_sample['value'] = (curr_lookups_lost - prev_lookups_lost) / time_delta_sec
@@ -499,6 +507,11 @@ def dpctl_datapath_stats(filename: str):
                 curr_masks_hit = int(pairs[1].split(':')[1])
                 curr_masks_total = int(pairs[2].split(':')[1])
 
+                if time_delta_sec <= 0:
+                    prev_masks_hit = curr_masks_hit
+                    prev_masks_total = curr_masks_total
+                    continue
+
                 masks_hit_sample['value'] = (curr_masks_hit - prev_masks_hit) / time_delta_sec
                 masks_total_sample['value'] = (curr_masks_total - prev_masks_total) / time_delta_sec
 
@@ -513,6 +526,10 @@ def dpctl_datapath_stats(filename: str):
                 #  cache: hit:46193519 hit-rate:59.61%
                 pairs = line[2:].split(' ')
                 curr_cache_hit = int(pairs[1].split(':')[1])
+
+                if time_delta_sec <= 0:
+                    prev_cache_hit = curr_cache_hit
+                    continue
 
                 cache_hit_sample['value'] = (curr_cache_hit - prev_cache_hit) / time_delta_sec
                 prev_cache_hit = curr_cache_hit
@@ -658,14 +675,18 @@ def dpctl_dump_flows(filename: str):
                 else:
                     time_stamp = prev_stamp
 
-                dpctl_dump_desc['type'] = 'ufid-new-flows-sec'
-                new_flow_rate = (curr_new_flow - prev_new_flow) / time_delta_sec
-                log_sample(file_id, dpctl_dump_desc, {'counter': 'new-flows-sec'},{'end':end_stamp_ms,'value':new_flow_rate})
-                prev_new_flow = curr_new_flow
+                if time_delta_sec > 0:
+                    begin_stamp_ms = end_stamp_ms - (time_delta_sec * 1000) + 1
 
-                dpctl_dump_desc['type'] = 'ufid-expired-flows-sec'
-                expired_flow_rate = (curr_expired_flow - prev_expired_flow) / time_delta_sec
-                log_sample(file_id, dpctl_dump_desc, {'counter': 'expired-flows-sec'},{'end':end_stamp_ms,'value':expired_flow_rate})
+                    dpctl_dump_desc['type'] = 'ufid-new-flows-sec'
+                    new_flow_rate = (curr_new_flow - prev_new_flow) / time_delta_sec
+                    log_sample(file_id, dpctl_dump_desc, {'counter': 'new-flows-sec'},{'begin':begin_stamp_ms,'end':end_stamp_ms,'value':new_flow_rate})
+
+                    dpctl_dump_desc['type'] = 'ufid-expired-flows-sec'
+                    expired_flow_rate = (curr_expired_flow - prev_expired_flow) / time_delta_sec
+                    log_sample(file_id, dpctl_dump_desc, {'counter': 'expired-flows-sec'},{'begin':begin_stamp_ms,'end':end_stamp_ms,'value':expired_flow_rate})
+
+                prev_new_flow = curr_new_flow
                 prev_expired_flow = curr_expired_flow
 
             elif 'ufid:' in line:
@@ -717,20 +738,24 @@ def dpctl_dump_flows(filename: str):
                 ufid:41f86fcb-5a71-46a1-8a2c-b18ac103ffd9, recirc_id(0x953b99),dp_hash(0/0),skb_priority(0/0),in_port(0707684fc6fdb77),skb_mark(0/0),ct_state(0x2a/0x3f),ct_zone(0/0),ct_mark(0/0),ct_label(0/0x3),eth(src=0a:58:75:0c:67:b1,dst=0a:58:06:cc:5b:0e),eth_type(0x86dd),ipv6(src=fd01:0:0:1::/ffff:ffff:ffff:ffff::,dst=fd01:0:0:2::16,label=0/0,proto=6,tclass=0/0x3,hlimit=64,frag=no),tcp(src=0/0,dst=0/0),tcp_flags(0/0), packets:1, bytes:826, used:4.972s, flags:P., dp:ovs, actions:ct_clear,set(tunnel(tun_id=0x4,ipv6_dst=fc00:1000::6,ttl=64,tp_dst=6081,geneve({class=0x102,type=0x80,len=4,0x30005}),flags(df|csum|key))),set(eth(src=0a:58:7d:50:4d:fc,dst=0a:58:85:e2:e6:5d)),set(ipv6(hlimit=63)),genev_sys_6081
                 ufid:8acc72d6-b3cb-4051-93e3-4d1177a97a0d, recirc_id(0x953be4),dp_hash(0/0),skb_priority(0/0),in_port(6e769d62d8f9785),skb_mark(0/0),ct_state(0x2a/0x3f),ct_zone(0/0),ct_mark(0/0),ct_label(0/0x1),eth(src=00:00:00:00:00:00/00:00:00:00:00:00,dst=0a:58:05:b9:5e:9f),eth_type(0x86dd),ipv6(src=::/::,dst=fd01:0:0:1::25,label=0/0,proto=0/0,tclass=0/0,hlimit=0/0,frag=no), packets:4, bytes:6396, used:3.145s, flags:P., dp:ovs, actions:1b771892fabde8c
                 '''
+                # Since we only want to log samples with 2 data points check if the prev_counts are still unset
+                if ufids[ufid_key]['prev_packet_count'] == -1 and ufids[ufid_key]['prev_byte_count'] == -1:
+                    continue
+
+                if time_delta_sec <= 0:
+                    continue
+
                 # math on packets / bytes
                 packet_rate = (ufids[ufid_key]['curr_packet_count'] - ufids[ufid_key]['prev_packet_count']) / time_delta_sec
                 bytes_to_Gbits = ((ufids[ufid_key]['curr_byte_count'] - ufids[ufid_key]['prev_byte_count']) * 8.0) / float(1_000_000_000)
                 bit_rate = bytes_to_Gbits / time_delta_sec
 
-                # Since we only want to log samples with 2 data points check if the prev_counts are still unset
-                if ufids[ufid_key]['prev_packet_count'] == -1 and ufids[ufid_key]['prev_byte_count'] == -1:
-                    continue
-
                 # log samples
+                begin_stamp_ms = end_stamp_ms - (time_delta_sec * 1000) + 1
                 dpctl_dump_desc['type'] = 'ufid-packets-sec'
-                log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'end': end_stamp_ms,'value':packet_rate})
+                log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'begin':begin_stamp_ms,'end': end_stamp_ms,'value':packet_rate})
                 dpctl_dump_desc['type'] = 'ufid-Gbps'
-                log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'end': end_stamp_ms,'value':bit_rate})
+                log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'begin':begin_stamp_ms,'end': end_stamp_ms,'value':bit_rate})
             else:
                 continue
 
@@ -767,6 +792,7 @@ def main():
     upcall_stats_process.join()
     dpctl_dump_process.join()
     pmd_counters_process.join()
+    return 0
 
 if __name__ == '__main__':
     exit(main())

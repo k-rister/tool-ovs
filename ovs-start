@@ -1,4 +1,6 @@
 #!/bin/bash
+# -*- mode: sh; indent-tabs-mode: nil; sh-basic-offset: 4 -*-
+# vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=bash
 exec >ovs-start-stderrout.txt
 exec 2>&1
 
@@ -49,4 +51,5 @@ if [ -e $ovs_collect ]; then
     echo $ovs_collect_pid >ovs-collect-pid.txt
 else
     echo "$ovs_collect is not present, exiting"
+    exit 1
 fi
