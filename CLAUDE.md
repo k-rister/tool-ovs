@@ -3,8 +3,9 @@
 ## Purpose
 Collects and post-processes Open vSwitch (OVS) and Open Virtual Network (OVN) performance data during benchmark execution. Captures bridge configurations, flow tables, PMD thread statistics, coverage counters, and memory usage.
 
-## Language
-Bash — all scripts (collection, start/stop, post-processing)
+## Languages
+- Bash: collection and lifecycle scripts (`ovs-collect`, `ovs-start`, `ovs-stop`)
+- Python: post-processor (`ovs-post-process`)
 
 ## Key Files
 | File | Purpose |
@@ -14,7 +15,7 @@ Bash — all scripts (collection, start/stop, post-processing)
 | `ovs-stop` | Kills collector, compresses output with xz |
 | `ovs-post-process` | Converts raw OVS data to CDM-compliant compressed output |
 | `rickshaw.json` | Rickshaw integration: endpoint allow/block lists, file deployment, post-process script |
-| `workshop.json` | Engine image build: compiles OVS 3.3.0 from source |
+| `workshop.json` | Engine image build: compiles OVS 3.5.4 from source |
 
 ## Conventions
 - Primary branch is `master`
