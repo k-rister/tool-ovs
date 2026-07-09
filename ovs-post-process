@@ -253,7 +253,7 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                     continue
 
                 if pmd:
-                    # We have a pmd section, find a subsection (datapth, iterations, packets) for this pmd:
+                    # We have a pmd section, find a subsection (datapath, iterations, packets) for this pmd:
                     # 
                     # NOTE: A 'pmd-stats-clear' is run after each 'pmd-stats-show' in order to get proper percent-busy
                     # and percent-idle for PMD used-cycles.  If the clear is not done, those stats will be cumulative since
@@ -261,10 +261,10 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                     #
                     # It is not possible to compute percent-busy and percent-idle for PMD usage by comparing idle-iterations (count)
                     # to busy-iterations (count).  The time spent in idle vs a busy iteration is completely different, and we need
-                    # the percent of time, not the percent of iterations.t
+                    # the percent of time, not the percent of iterations.
                     #
-                    # The side affect of this is that one cannot diff a stat which is a 'count' from one sample to the next because
-                    # the count gets reset to 0 just after very sample. This would typically be done for other tools, getting
+                    # The side effect of this is that one cannot diff a stat which is a 'count' from one sample to the next because
+                    # the count gets reset to 0 just after every sample. This would typically be done for other tools, getting
                     # a delta between samples (delta = work done) then dividing by the time difference (throughput = work/time).
                     # However, there is a 'Measurement duration: 3.053 s' in the stats log, so one can take the current sample
                     # count stat (like Tx packets) and divide by the Measurement duration.
@@ -317,7 +317,7 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                             log_sample(file_id, desc, names, sample)
                         else:
                             if match_packets_kpps := re.search(r'\s*(\d+)\sKpps.*', match_packets.group(3)):
-                                sample['value'] = match_packets_kpps.group(1)
+                                sample['value'] = int(match_packets_kpps.group(1))
                                 log_sample(file_id, desc, names, sample)
                             else:
                                 print('WARNING: found non-zero packets but no match for Kpps:')
@@ -637,9 +637,9 @@ def dpctl_dump_flows(filename: str):
     time_delta_sec = 0
     file_id = 'dpctl-dump-flows'
     ip_proto_lookup_table = {'0': 'NA', '1': 'ICMP',\
-        '2': 'IGMP', '6': 'IGMP', '17': 'UDP', '47': 'GRE'}
+        '2': 'IGMP', '6': 'TCP', '17': 'UDP', '47': 'GRE'}
 
-    # lower case hex string for comparision
+    # lower case hex string for comparison
     eth_type_lookup_table = {'0x0800': 'IPv4','0x86dd': 'IPv6',\
         '0x8808': 'Ethernet Flow Control','0x88cc': 'LLDP','0x0806': 'ARP'}
 
@@ -656,7 +656,7 @@ def dpctl_dump_flows(filename: str):
                 time_delta_sec = curr_stamp - prev_stamp
 
                 # check expired flows
-                # flow freshnes is stamped with curr_stamp when a flow appears in the file
+                # flow freshness is stamped with curr_stamp when a flow appears in the file
                 # if a flow is in the ufids dictionary and its stamp
                 # doesn't match the previous stamp then it probably matches
                 # the prev_prev stamp, so it didn't get updated and needs to be
