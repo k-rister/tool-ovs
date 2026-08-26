@@ -1,0 +1,69 @@
+{
+  "rickshaw-tool-metadata": {
+    "schema": {
+      "version": "2026.08.11"
+    }
+  },
+  "tool": "ovs",
+  "description": "Open vSwitch (OVS) and Open Virtual Network (OVN) performance metrics collector capturing bridge flow tables, port counters, PMD thread statistics, datapath lookup rates, and memory usage.",
+  "cdm_indexed": true,
+  "cdm_sources": [
+    {
+      "source": "ovs-dpctl",
+      "types": [
+        "ct-stats-show",
+        "flows-count",
+        "lookups-sec",
+        "masks-sec",
+        "cache-sec",
+        "ufid-new-flows-sec",
+        "ufid-expired-flows-sec",
+        "ufid-packets-sec",
+        "ufid-Gbps"
+      ]
+    },
+    {
+      "source": "ovs-appctl",
+      "types": [
+        "mem-show",
+        "upcall-flow",
+        "upcall-flow-avg",
+        "upcall-flow-max",
+        "upcall-flow-limit",
+        "upcall-flow-dump-duration-ms"
+      ]
+    },
+    {
+      "source": "ovs-ofctl",
+      "types": [
+        "packets-sec",
+        "Gbps",
+        "errors-sec"
+      ]
+    },
+    {
+      "source": "ovs-pmd",
+      "types": [
+        "datapath-hits-sec",
+        "kpps",
+        "pmd-busy",
+        "pmd-idle"
+      ]
+    }
+  ],
+  "output_files": [
+    "appctl-coverage-show.txt.xz",
+    "appctl-dpctl-ct-stats-show.txt.xz",
+    "appctl-dpctl-dump-flows.txt.xz",
+    "appctl-dpctl-show.txt.xz",
+    "appctl-dpif-netdev-pmd-perf-show.txt.xz",
+    "appctl-memory-show.txt.xz",
+    "appctl-upcall-show.txt.xz",
+    "ofctl-dump-flows.txt.xz",
+    "ofctl-dump-ports.txt.xz",
+    "pmd-stats-clear.stdouterr.txt.xz",
+    "ovs-collect-pid.txt",
+    "ovs-start-stderrout.txt",
+    "ovs-stop-stderrout.txt"
+  ]
+}
