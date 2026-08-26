@@ -15,7 +15,7 @@ Crucible tool for collecting and post-processing Open vSwitch (OVS) and Open Vir
 | `ovs-stop` | Sends SIGTERM to collector, compresses output logs with xz |
 | `ovs-post-process` | Multiprocess post-processor converting raw OVS data to CDM metrics (`ovs-dpctl`, `ovs-appctl`, `ovs-ofctl`, `ovs-pmd`) |
 | `rickshaw.json` | Rickshaw integration: collector scripts, blacklist/whitelist |
-| `workshop.json` | Engine image build: compiles OVS from source |
+| `workshop.json` | Engine image build: compiles OVS 3.5.4 from source |
 | `tool-metadata.json` | Machine-readable description and CDM-indexed status (consumed by `crucible tools list`) |
 | `multiplex.json` | Parameter validation rules and `defaults` preset for multiplex (mirrors benchmark `multiplex.json`) |
 
