@@ -5,7 +5,7 @@ Crucible tool for collecting and post-processing Open vSwitch (OVS) and Open Vir
 
 ## Languages
 - Bash: collection and lifecycle scripts (`ovs-collect`, `ovs-start`, `ovs-stop`)
-- Python: post-processor (`ovs-post-process`)
+- Python: post-processor (`ovs-post-process.py`)
 
 ## Key Files
 | File | Purpose |
@@ -13,7 +13,7 @@ Crucible tool for collecting and post-processing Open vSwitch (OVS) and Open Vir
 | `ovs-collect` | Main collection loop: dumps flows, appctl stats, coverage/memory data at configurable intervals |
 | `ovs-start` | Parses `--interval` parameter (default: `3`), launches `ovs-collect` in background |
 | `ovs-stop` | Sends SIGTERM to collector, compresses output logs with xz |
-| `ovs-post-process` | Multiprocess post-processor converting raw OVS data to CDM metrics (`ovs-dpctl`, `ovs-appctl`, `ovs-ofctl`, `ovs-pmd`) |
+| `ovs-post-process.py` | Multiprocess post-processor converting raw OVS data to CDM metrics (`ovs-dpctl`, `ovs-appctl`, `ovs-ofctl`, `ovs-pmd`) |
 | `rickshaw.json` | Rickshaw integration: collector scripts, blacklist/whitelist |
 | `workshop.json` | Engine image build: compiles OVS 3.5.4 from source |
 | `tool-metadata.json` | Machine-readable description and CDM-indexed status (consumed by `crucible tools list`) |
@@ -26,7 +26,7 @@ Crucible tool for collecting and post-processing Open vSwitch (OVS) and Open Vir
 - `ovs-start` — Validates `ovs-collect` presence, starts `ovs-collect $interval &`, and stores PID in `ovs-collect-pid.txt`
 - `ovs-collect` — Queries `ovs-vsctl` for bridge list, then loops over `ovs-ofctl` (dump-ports, dump-flows) and `ovs-appctl` (dpctl/dump-flows, dpctl/ct-stats-show, dpctl/show, coverage/show, memory/show, upcall/show, dpif-netdev/pmd-perf-show)
 - `ovs-stop` — Sends SIGTERM to `ovs-collect`, verifies termination, and compresses raw data files (`ofctl*.txt`, `appctl*.txt`, `pmd-stats-clear.stdouterr.txt`) with xz
-- `ovs-post-process` — Spawns parallel worker processes for each data stream:
+- `ovs-post-process.py` — Spawns parallel worker processes for each data stream:
   - `conntrack_post_process` -> `ovs-dpctl:ct-stats-show`
   - `dpctl_memory_show_process` -> `ovs-appctl:mem-show`
   - `ofctl_port_counters` -> `ovs-ofctl:packets-sec`, `ovs-ofctl:Gbps`, `ovs-ofctl:errors-sec`
@@ -36,8 +36,8 @@ Crucible tool for collecting and post-processing Open vSwitch (OVS) and Open Vir
   - `dpctl_dump_flows` -> `ovs-dpctl:ufid-new-flows-sec`, `ovs-dpctl:ufid-expired-flows-sec`, `ovs-dpctl:ufid-packets-sec`, `ovs-dpctl:ufid-Gbps`
 
 ## Testing
-- Run post-processor locally: `cd <tool-data-dir> && TOOLBOX_HOME=/opt/crucible/subprojects/core/toolbox python3 /opt/crucible/subprojects/tools/ovs/ovs-post-process`
-- Validate syntax: `python3 -c "import py_compile; py_compile.compile('ovs-post-process', doraise=True)"`
+- Run post-processor locally: `cd <tool-data-dir> && TOOLBOX_HOME=/opt/crucible/subprojects/core/toolbox python3 /opt/crucible/subprojects/tools/ovs/ovs-post-process.py`
+- Validate syntax: `python3 -c "import py_compile; py_compile.compile('ovs-post-process.py', doraise=True)"`
 - Full integration: `crucible run <run-file.json>` with ovs tool configured on OVS-enabled endpoint
 
 ## Conventions
