@@ -21,11 +21,11 @@ else:
         print("ERROR: <TOOLBOX_HOME>/python ('%s') does not exist!" % (p))
         exit(2)
     sys.path.append(str(p))
-from toolbox.metrics import log_sample
-from toolbox.metrics import finish_samples
+from toolbox.cdm_metrics import CDMMetrics
 
 def conntrack_post_process(filename: str):
     print('ovs-post-process-conntrack')
+    metrics = CDMMetrics()
     # Made for the file conntrack-stats-show.txt.xz
     file_name = filename
     with lzma.open(file_name, 'rt') as file:
@@ -56,30 +56,31 @@ def conntrack_post_process(filename: str):
             elif 'Total' in line:
                 # Total: 0
                 total_sample['value'] = int(line.split(':')[1])
-                log_sample(file_id_ovs, desc, proto_total, total_sample)
+                metrics.log_sample(file_id_ovs, desc, proto_total, total_sample)
             elif 'TCP' in line:
                 # TCP: 2587
                 tcp_sample['value'] = int(line.split(':')[1])
-                log_sample(file_id_ovs, desc, proto_tcp, tcp_sample)
+                metrics.log_sample(file_id_ovs, desc, proto_tcp, tcp_sample)
             elif 'UDP' in line:
                 # UDP: 74
                 udp_sample['value'] = int(line.split(':')[1])
-                log_sample(file_id_ovs, desc, proto_udp, udp_sample)
+                metrics.log_sample(file_id_ovs, desc, proto_udp, udp_sample)
             elif 'ICMP' in line:
                 # ICMP: 3
                 icmp_sample['value'] = int(line.split(':')[1])
-                log_sample(file_id_ovs, desc, proto_icmp, icmp_sample)
+                metrics.log_sample(file_id_ovs, desc, proto_icmp, icmp_sample)
             elif 'Other' in line:
                 # Other: 2
                 other_sample['value'] = int(line.split(':')[1])
-                log_sample(file_id_ovs, desc, proto_other, other_sample)
+                metrics.log_sample(file_id_ovs, desc, proto_other, other_sample)
             else:
                 continue
 
-    finish_samples()
+    metrics.finish_samples()
 
 def dpctl_memory_show_process(filename: str):
     print('ovs-post-process-dpctl-memory-show')
+    metrics = CDMMetrics()
     file_name = filename
     with lzma.open(file_name,'rt') as file:
         desc = {'source': 'ovs-appctl', 'class': 'count', 'type': 'mem-show'}
@@ -124,19 +125,19 @@ def dpctl_memory_show_process(filename: str):
                 for key in metric_keys:
                     if key in fields:
                         sample['value'] = fields[key]
-                        log_sample(file_id, desc, {'source': key}, copy.copy(sample))
+                        metrics.log_sample(file_id, desc, {'source': key}, copy.copy(sample))
                 if 'udpif keys' in fields:
                     sample['value'] = fields['udpif keys']
-                    log_sample(file_id, desc, {'source': 'udpif-keys'}, copy.copy(sample))
+                    metrics.log_sample(file_id, desc, {'source': 'udpif-keys'}, copy.copy(sample))
                 first_key = line.split(':')[0].split()[0] if line else None
                 if first_key and first_key in fields:
                     sample['value'] = fields[first_key]
-                    log_sample(file_id, desc, {'source': first_key}, copy.copy(sample))
+                    metrics.log_sample(file_id, desc, {'source': first_key}, copy.copy(sample))
 
-    finish_samples()
+    metrics.finish_samples()
 
 
-def compute_and_log_stats(br_name: str, new_br_data: dict, old_br_data: dict):
+def compute_and_log_stats(metrics, br_name: str, new_br_data: dict, old_br_data: dict):
     # This function is responsible for calculating the rate of change, This is done with the parsed date stamp
     # rate = (new - old)/time_delta
     # example of br_data that is being parsed in this function
@@ -202,7 +203,7 @@ def compute_and_log_stats(br_name: str, new_br_data: dict, old_br_data: dict):
                 if log_desc['type'] == 'Gbps':
                     rate = (rate * 8) / 1_000_000_000
                 sample = {'end': int(new_br_data['timestamp'] * 1000),'value': float(rate)}
-                log_sample(file_id, log_desc, log_names, sample)
+                metrics.log_sample(file_id, log_desc, log_names, sample)
             except KeyError:
                 # if a port appears, it will be in the new data and not the old
                 # catch the key error, will only happen once per port appearance
@@ -210,6 +211,7 @@ def compute_and_log_stats(br_name: str, new_br_data: dict, old_br_data: dict):
 
 def appctl_dpif_netdev_pmd_perf_show(filename: str):
     print('ovs-post-process-appctl-dpif-netdev-pmd-perf-show')
+    metrics = CDMMetrics()
     file_id = 'ovs-pmd'
 
     with lzma.open(filename,'rt') as file:
@@ -286,7 +288,7 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                         sample['value'] = float(match_dp.group(2));
                         if duration_sec:
                             sample['value'] /= duration_sec
-                            log_sample(file_id, desc, names, sample)
+                            metrics.log_sample(file_id, desc, names, sample)
                         else:
                             print('WARNING: did not have duration for hits-sec calc')
                         continue
@@ -300,7 +302,7 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                         sample['value'] = float(match_dp.group(2));
                         if duration_sec:
                             sample['value'] /= duration_sec
-                            log_sample(file_id, desc, names, sample)
+                            metrics.log_sample(file_id, desc, names, sample)
                         else:
                             print('WARNING: did not have duration for hits-sec calc')
                         continue
@@ -314,11 +316,11 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                         names['direction'] = match_packets.group(1)
                         if match_packets.group(2) == '0':
                             sample['value'] = 0
-                            log_sample(file_id, desc, names, sample)
+                            metrics.log_sample(file_id, desc, names, sample)
                         else:
                             if match_packets_kpps := re.search(r'\s*(\d+)\sKpps.*', match_packets.group(3)):
                                 sample['value'] = int(match_packets_kpps.group(1))
-                                log_sample(file_id, desc, names, sample)
+                                metrics.log_sample(file_id, desc, names, sample)
                             else:
                                 print('WARNING: found non-zero packets but no match for Kpps:')
                                 print(line)
@@ -329,18 +331,19 @@ def appctl_dpif_netdev_pmd_perf_show(filename: str):
                     if match_busy_idle := re.search(r'^\s\s\-\s(busy|idle)\siterations:\s*\d+\s*\(\s*(\d+\.\d+)\s%\sof\sused\scycles\)', line):
                         desc['type'] = 'pmd-' + match_busy_idle.group(1) # 'busy' or 'idle'
                         sample['value'] = float(match_busy_idle.group(2)) / 100
-                        log_sample(file_id, desc, names, sample)
+                        metrics.log_sample(file_id, desc, names, sample)
                         continue
 
                     print('WARNING: ********** could not find match for [' + line + ']')
                 continue
             continue
-    finish_samples()
+    metrics.finish_samples()
 
 
 
 def ofctl_port_counters(filename: str):
     print('ovs-post-process-ofctl-dump-ports')
+    metrics = CDMMetrics()
     # assume that number of ports per bridge will change during the run
     # we don't control the coming and going of pods
     prev_bridges = {}
@@ -365,7 +368,7 @@ def ofctl_port_counters(filename: str):
                         prev_bridges[br_name] = bridges[br_name]
                     else:
                         # stats are already there, time to calc and log the stats
-                        compute_and_log_stats(br_name,bridges[br_name], prev_bridges[br_name])
+                        compute_and_log_stats(metrics, br_name,bridges[br_name], prev_bridges[br_name])
                         prev_bridges[br_name] = bridges[br_name]
 
                 # init the structure with a clean dictionary
@@ -412,10 +415,11 @@ def ofctl_port_counters(filename: str):
             else:
                 continue
 
-    finish_samples()
+    metrics.finish_samples()
 
 def dpctl_datapath_stats(filename: str):
     print("ovs-post-process-dpctl-datapath-stats")
+    metrics = CDMMetrics()
     dp_names = []
     flow_desc_count = {'source': 'ovs-dpctl', 'type': 'flows-count', 'class': 'count'}
     lookups_desc_rate = {'source': 'ovs-dpctl', 'type': 'lookups-sec', 'class': 'count'}
@@ -487,9 +491,9 @@ def dpctl_datapath_stats(filename: str):
                 prev_lookups_miss = curr_lookups_miss
                 prev_lookups_lost = curr_lookups_lost
 
-                log_sample(file_id, lookups_desc_rate, {'interface': dp_names[-1], 'action': 'hit'}, lookups_hit_sample)
-                log_sample(file_id, lookups_desc_rate, {'interface': dp_names[-1], 'action': 'miss'}, lookups_miss_sample)
-                log_sample(file_id, lookups_desc_rate, {'interface': dp_names[-1], 'action': 'lost'}, lookups_lost_sample)
+                metrics.log_sample(file_id, lookups_desc_rate, {'interface': dp_names[-1], 'action': 'hit'}, lookups_hit_sample)
+                metrics.log_sample(file_id, lookups_desc_rate, {'interface': dp_names[-1], 'action': 'miss'}, lookups_miss_sample)
+                metrics.log_sample(file_id, lookups_desc_rate, {'interface': dp_names[-1], 'action': 'lost'}, lookups_lost_sample)
 
             elif 'flows:' in line:
                 #  flows: 554
@@ -498,7 +502,7 @@ def dpctl_datapath_stats(filename: str):
 
 
                 flows_sample['value'] = curr_flows
-                log_sample(file_id, flow_desc_count, {'interface': dp_names[-1], 'counter': 'flows'}, flows_sample)
+                metrics.log_sample(file_id, flow_desc_count, {'interface': dp_names[-1], 'counter': 'flows'}, flows_sample)
 
 
             elif 'masks:' in line:
@@ -518,8 +522,8 @@ def dpctl_datapath_stats(filename: str):
                 prev_masks_hit = curr_masks_hit
                 prev_masks_total = curr_masks_total
 
-                log_sample(file_id, masks_desc_rate, {'interface': dp_names[-1], 'action': 'hit'}, masks_hit_sample)
-                log_sample(file_id, masks_desc_rate, {'interface': dp_names[-1], 'action': 'total'}, masks_total_sample)
+                metrics.log_sample(file_id, masks_desc_rate, {'interface': dp_names[-1], 'action': 'hit'}, masks_hit_sample)
+                metrics.log_sample(file_id, masks_desc_rate, {'interface': dp_names[-1], 'action': 'total'}, masks_total_sample)
 
             # startswith is slower, but coding around the false positives is uglier
             elif line.startswith('  cache:'):
@@ -533,7 +537,7 @@ def dpctl_datapath_stats(filename: str):
 
                 cache_hit_sample['value'] = (curr_cache_hit - prev_cache_hit) / time_delta_sec
                 prev_cache_hit = curr_cache_hit
-                log_sample(file_id, cache_desc_rate, {'interface': dp_names[-1], 'action': 'hit'}, cache_hit_sample)
+                metrics.log_sample(file_id, cache_desc_rate, {'interface': dp_names[-1], 'action': 'hit'}, cache_hit_sample)
 
             elif 'port 0' in line:
                 # Use port 0 as token to remove the datapath name from the print
@@ -545,10 +549,11 @@ def dpctl_datapath_stats(filename: str):
                 continue
 
 
-    finish_samples()
+    metrics.finish_samples()
 
 def upcall_stats(filename: str):
     print("ovs-post-process-upcall-stats")
+    metrics = CDMMetrics()
     upcall_flow_count = {'source': 'ovs-appctl', 'type': 'upcall-flow', 'class': 'count'}
     upcall_avg_count = {'source': 'ovs-appctl', 'type': 'upcall-flow-avg', 'class': 'count'}
     upcall_max_count = {'source': 'ovs-appctl', 'type': 'upcall-flow-max', 'class': 'count'}
@@ -593,10 +598,10 @@ def upcall_stats(filename: str):
                 max_sample['value'] = curr_max
                 limit_sample['value'] = curr_limit
 
-                log_sample(file_id, upcall_flow_count,{'interface':dp_names[-1],'counter':'flow'},flow_sample)
-                log_sample(file_id, upcall_avg_count,{'interface':dp_names[-1],'counter':'avg'},avg_sample)
-                log_sample(file_id, upcall_max_count,{'interface':dp_names[-1],'counter':'max'},max_sample)
-                log_sample(file_id, upcall_limit_count,{'interface':dp_names[-1],'counter':'limit'},limit_sample)
+                metrics.log_sample(file_id, upcall_flow_count,{'interface':dp_names[-1],'counter':'flow'},flow_sample)
+                metrics.log_sample(file_id, upcall_avg_count,{'interface':dp_names[-1],'counter':'avg'},avg_sample)
+                metrics.log_sample(file_id, upcall_max_count,{'interface':dp_names[-1],'counter':'max'},max_sample)
+                metrics.log_sample(file_id, upcall_limit_count,{'interface':dp_names[-1],'counter':'limit'},limit_sample)
 
 
             elif 'duration' in line:
@@ -605,7 +610,7 @@ def upcall_stats(filename: str):
                 # slice 'ms' off the value
                 curr_duration = int(pairs[:-2])
                 duration_sample['value'] = curr_duration
-                log_sample(file_id, upcall_duration_count,{'interface':dp_names[-1],'counter':'duration'},duration_sample)
+                metrics.log_sample(file_id, upcall_duration_count,{'interface':dp_names[-1],'counter':'duration'},duration_sample)
 
             elif 'ufid' in line:
                 # use ufid as a per-datapath token
@@ -614,7 +619,7 @@ def upcall_stats(filename: str):
             else:
                 continue
 
-    finish_samples()
+    metrics.finish_samples()
 
 def extract_inside_parens(paren_str: str) -> str:
     left = paren_str.find('(')
@@ -627,6 +632,7 @@ def extract_inside_parens(paren_str: str) -> str:
 
 def dpctl_dump_flows(filename: str):
     print('ovs-post-process-dpctl-dump-flows')
+    metrics = CDMMetrics()
     dpctl_dump_desc = {'source' : 'ovs-dpctl','class': 'count'}
     curr_stamp = 0
     prev_stamp = 0
@@ -680,11 +686,11 @@ def dpctl_dump_flows(filename: str):
 
                     dpctl_dump_desc['type'] = 'ufid-new-flows-sec'
                     new_flow_rate = (curr_new_flow - prev_new_flow) / time_delta_sec
-                    log_sample(file_id, dpctl_dump_desc, {'counter': 'new-flows-sec'},{'begin':begin_stamp_ms,'end':end_stamp_ms,'value':new_flow_rate})
+                    metrics.log_sample(file_id, dpctl_dump_desc, {'counter': 'new-flows-sec'},{'begin':begin_stamp_ms,'end':end_stamp_ms,'value':new_flow_rate})
 
                     dpctl_dump_desc['type'] = 'ufid-expired-flows-sec'
                     expired_flow_rate = (curr_expired_flow - prev_expired_flow) / time_delta_sec
-                    log_sample(file_id, dpctl_dump_desc, {'counter': 'expired-flows-sec'},{'begin':begin_stamp_ms,'end':end_stamp_ms,'value':expired_flow_rate})
+                    metrics.log_sample(file_id, dpctl_dump_desc, {'counter': 'expired-flows-sec'},{'begin':begin_stamp_ms,'end':end_stamp_ms,'value':expired_flow_rate})
 
                 prev_new_flow = curr_new_flow
                 prev_expired_flow = curr_expired_flow
@@ -753,13 +759,13 @@ def dpctl_dump_flows(filename: str):
                 # log samples
                 begin_stamp_ms = end_stamp_ms - (time_delta_sec * 1000) + 1
                 dpctl_dump_desc['type'] = 'ufid-packets-sec'
-                log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'begin':begin_stamp_ms,'end': end_stamp_ms,'value':packet_rate})
+                metrics.log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'begin':begin_stamp_ms,'end': end_stamp_ms,'value':packet_rate})
                 dpctl_dump_desc['type'] = 'ufid-Gbps'
-                log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'begin':begin_stamp_ms,'end': end_stamp_ms,'value':bit_rate})
+                metrics.log_sample(file_id,dpctl_dump_desc,{'id':ufid_key},{'begin':begin_stamp_ms,'end': end_stamp_ms,'value':bit_rate})
             else:
                 continue
 
-    finish_samples()
+    metrics.finish_samples()
 
 def main():
     print("ovs-post-process-multiprocess-launcher")
