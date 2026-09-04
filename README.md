@@ -6,7 +6,7 @@ Collect and post-process Open vSwitch (OVS) and Open Virtual Network (OVN) data 
 Name | Description
 -----|------------
 ovs-collect | Collects data at a specified interval on Open vSwitch bridges and flows, then saves the output to separate files named after the command being run.
-ovs-post-process | Perform post-processing tasks on Open vSwitch data, such as generating datapath statistics or dumping flow tables. Saves output to compressed files that adhere to a [Common Data Model (CDM) Schema](https://github.com/perftool-incubator/CommonDataModel). 
+ovs-post-process.py | Perform post-processing tasks on Open vSwitch data, such as generating datapath statistics or dumping flow tables. Saves output to compressed files that adhere to a [Common Data Model (CDM) Schema](https://github.com/perftool-incubator/CommonDataModel).
 ovs-start | Sets the standard output and error to a file, collects some system information, parses command line arguments, and executes the ovs-collect command with a specified interval.
 ovs-stop | Writes output to a file, identifies the PID of a running process (ovs-collect) using a file, and then sends it a SIGTERM signal to stop it. If the [xz utility](https://tukaani.org/xz/) is available, it compresses any ovs data files.
 
